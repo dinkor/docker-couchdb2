@@ -43,12 +43,17 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
 	&& apt-get install -y \
 		nodejs \
 
-	&& curl -fSL -o /tmp/kerl https://raw.githubusercontent.com/kerl/kerl/master/kerl \
-	&& chmod +x /tmp/kerl \
-	&& /tmp/kerl update releases \
-	&& /tmp/kerl build ${ERLANG_VERSION} ${ERLANG_VERSION} \
-	&& /tmp/kerl install ${ERLANG_VERSION} /tmp/erlang \
-	&& /tmp/kerl cleanup all \
+        && curl -fSL -o /tmp/erlang-solutions_1.0_all.deb  https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb \
+        && dpkg -i /tmp/erlang-solutions_1.0_all.deb \
+        && echo "Package: erlang*" > /etc/apt/preferences.d/erlang_version \
+        && echo "Pin: version 1:${ERLANG_VERSION}*" >> /etc/apt/preferences.d/erlang_version \
+        && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/erlang_version \
+        && apt-get update \
+        && apt-get install -y \
+                erlang-dev \
+                erlang-nox \
+                erlang-observer \
+                erlang-src \
 
 	&& npm install -g grunt-cli \
 	&& git clone --depth 1 --single-branch -b ${COUCHDB_BRANCH} ${COUCHDB_REPO} /tmp/couchdb \
@@ -75,10 +80,15 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
 		libssl-dev \
 		curl \
 		nodejs \
+		erlang-dev \
+		erlang-nox \
+		erlang-observer \
+		erlang-src \
+		erlang-solutions \
 	&& apt-get clean \
 	&& rm -f /etc/apt/apt.conf.d/build_docker_norecommends \
+	&& rm -f /etc/apt/preferences.d/erlang_version \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& rm -rf ~/.kerl/ \
 	&& rm -rf ~/.npm/ \
 	&& rm -rf /tmp/*
 
