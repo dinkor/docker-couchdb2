@@ -50,10 +50,7 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
         && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/erlang_version \
         && apt-get update \
         && apt-get install -y \
-                erlang-dev \
-                erlang-nox \
-                erlang-observer \
-                erlang-src \
+                erlang \
 
 	&& npm install -g grunt-cli \
 	&& git clone --depth 1 --single-branch -b ${COUCHDB_BRANCH} ${COUCHDB_REPO} /tmp/couchdb \
@@ -80,10 +77,7 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
 		libssl-dev \
 		curl \
 		nodejs \
-		erlang-dev \
-		erlang-nox \
-		erlang-observer \
-		erlang-src \
+		erlang \
 		erlang-solutions \
 	&& apt-get clean \
 	&& rm -f /etc/apt/apt.conf.d/build_docker_norecommends \
