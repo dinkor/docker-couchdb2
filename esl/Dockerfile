@@ -9,10 +9,7 @@ ARG ERLANG_VERSION=18.3
 ARG COUCHDB_REPO=https://github.com/apache/couchdb.git
 ARG COUCHDB_BRANCH=master
 ARG COUCHDB_DIR=/opt/couchdb
-
-ENV PATH=/tmp/erlang/bin:${PATH}
-
-# Add CouchDB user account
+ARG CONFIGURE_OPTIONS="--disable-docs"
 
 RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_norecommends \
 	&& echo 'APT::Get::AutomaticRemove "true";' >> /etc/apt/apt.conf.d/build_docker_norecommends \
@@ -56,16 +53,16 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
 	&& git clone --depth 1 --single-branch -b ${COUCHDB_BRANCH} ${COUCHDB_REPO} /tmp/couchdb \
 	&& cd /tmp/couchdb \
 	# TODO: remove this
-	&& sed -i -e 's/^\({fauxton,\s*"fauxton",\s*\){tag, "v1.1.9"}\(.*\)$/\1"2e770d66b2b849a60468ad390dfed57da54561a9"\2/' rebar.config.script \
-	&& ./configure --disable-docs \
+	&& sed -i -e 's/^\({fauxton,\s*"fauxton",\s*\){tag, "v1.1.9"}\(.*\)$/\1"2cec2e4d975446080247c53ccc8d50c6b6fcbcba"\2/' rebar.config.script \
+	&& ./configure ${CONFIGURE_OPTIONS} \
 	&& make release \
 	&& useradd --user-group --home-dir ${COUCHDB_DIR} ${USER} \
 	&& mkdir ${COUCHDB_DIR} \
 	&& mv rel/couchdb/* ${COUCHDB_DIR} \
-	&& mkdir ${COUCHDB_DIR}/data ${COUCHDB_DIR}/etc/local.d ${COUCHDB_DIR}/etc/default.d \
+	&& mkdir ${COUCHDB_DIR}/data \
 	&& chown -R ${USER}:${USER} ${COUCHDB_DIR} \
-	&& curl -fSL -o /tmp/dumb-init_${DUMB_INIT_VERSION}_amd64.deb https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64.deb \
-	&& dpkg -i /tmp/dumb-init_*_amd64.deb \
+	&& curl -fSL -o /tmp/dumb-init.deb https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64.deb \
+	&& dpkg -i /tmp/dumb-init.deb \
 	&& npm uninstall -g grunt-cli \
 	&& apt-get purge -y \
 		apt-transport-https \
@@ -75,21 +72,35 @@ RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/build_docker_n
 		libmozjs185-dev \
 		libncurses5-dev \
 		libssl-dev \
-		curl \
 		nodejs \
 		erlang \
 		erlang-solutions \
 	&& apt-get clean \
-	&& rm -f /etc/apt/apt.conf.d/build_docker_norecommends \
+	&& rm -f /etc/apt/apt.conf.d/build_docker_norecommends /etc/apt/sources.list.d/nodesource.list \
 	&& rm -f /etc/apt/preferences.d/erlang_version \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& rm -rf ~/.npm/ \
 	&& rm -rf /tmp/*
 
+COPY couchdb_* ${COUCHDB_DIR}/bin/
+RUN chmod +x ${COUCHDB_DIR}/bin/couchdb_*
+RUN chown ${USER}:${USER} ${COUCHDB_DIR}/bin/couchdb_*
+
+ENV COOKIE=""
+# INIT_DB single | cluster | none
+ENV INIT_DB=single
+ENV NODE_NAME=""
+ENV CLUSTER_NODE=""
+ENV CLUSTER_PORT=5984
+ENV BIND_ADDRESS=0.0.0.0
+ENV PORT=5984
+ENV ADMIN=admin
+ENV PASSWORD=""
+
 USER ${USER}
 WORKDIR ${COUCHDB_DIR}
 EXPOSE 5984 4369 9100
-VOLUME ["/opt/couchdb/data"]
+VOLUME ["${COUCHDB_DIR}/data", "${COUCHDB_DIR}/etc"]
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/opt/couchdb/bin/couchdb"]
+CMD ["bin/couchdb_start"]
 

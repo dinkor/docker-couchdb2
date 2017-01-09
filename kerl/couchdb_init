@@ -1,0 +1,75 @@
+#!/bin/sh
+
+BASE_URL="http://127.0.0.1:${PORT}"
+HEADERS='-H Content-Type:application/json'
+AUTH="--user ${ADMIN}:${PASSWORD}"
+PUT="curl -f -X PUT ${HEADERS} ${BASE_URL}"
+PUT_AUTH="curl -f -X PUT ${AUTH} ${HEADERS} ${BASE_URL}"
+POST="curl -f -X POST ${HEADERS} ${BASE_URL}"
+POST_AUTH="curl -f -X POST ${AUTH} ${HEADERS} ${BASE_URL}"
+
+# wait for CouchDb up
+COUNT=0
+while [ ${COUNT} -lt 10 ]; do
+	sleep 1
+	curl -f -X GET "${BASE_URL}/"
+	CURL_RESULT=$?
+	if [ "${CURL_RESULT}" = "0" ]; then
+		break
+	fi
+	COUNT=`expr ${COUNT} + 1`
+done
+
+if [ "${CURL_RESULT}" != "0" ]; then
+	echo "=========================" \
+	&& echo "WARNING!!!" \
+	&& echo "Erroe while connectong to ${BASE_URL}" \
+	&& echo "========================="
+	exit 1
+fi
+
+if [ -z ${PASSWORD} ]; then
+	PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;`
+fi
+
+case ${INIT_DB} in
+	single)
+		${PUT}/_users \
+		&& ${PUT}/_replicator \
+		&& ${PUT}/_global_changes \
+		&& ${PUT}/_node/${NODE_NAME}/_config/chttpd/bind_address -d '"'${BIND_ADDRESS}'"' \
+		&& ${PUT}/_node/${NODE_NAME}/_config/admins/${ADMIN} -d '"'${PASSWORD}'"' \
+		&& echo "=========================" \
+		&& echo "Node type: SINGLE" \
+		&& echo "Node name: ${NODE_NAME}" \
+		&& echo "Cookie: ${COOKIE}" \
+		&& echo "Admin: ${ADMIN}" \
+		&& echo "Password: ${PASSWORD}" \
+		&& echo "=========================" \
+		&& touch ${HOME}/.couchdb_init
+		;;
+	cluster)
+		${POST}/_cluster_setup -d '{"action":"enable_cluster","username":"'${ADMIN}'","password":"'${PASSWORD}'","bind_address":"'${BIND_ADDRESS}'","port":'${PORT}'}' \
+		&& if [ ! -z ${CLUSTER_NODE} ]
+			then
+				${POST_AUTH}/_cluster_setup -d '{"action":"add_node","username":"'${ADMIN}'","password":"'${PASSWORD}'","host":"'${CLUSTER_NODE}'","port":'${CLUSTER_PORT}'}'
+			fi \
+		&& ${POST_AUTH}/_cluster_setup -d '{"action":"finish_cluster"}' \
+		&& echo "=========================" \
+		&& echo "Node type: CLUSTER" \
+		&& echo "Node name: ${NODE_NAME}" \
+		&& echo "Cookie: ${COOKIE}" \
+		&& echo "Admin: ${ADMIN}" \
+		&& echo "Password: ${PASSWORD}" \
+		&& echo "=========================" \
+		&& touch ${HOME}/.couchdb_init
+		;;
+	*)
+		echo "=========================" \
+		&& echo "Node type: NONE" \
+		&& echo "Node name: ${NODE_NAME}" \
+		&& echo "Cookie: ${COOKIE}" \
+		&& echo "=========================" \
+		&& touch ${HOME}/.couchdb_init
+esac
+

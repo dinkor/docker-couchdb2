@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+if [ ! -f ${HOME}/.couchdb_init ]; then
+	if [ -z ${COOKIE} ]; then
+		COOKIE=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;`
+	fi
+	if [ -z ${NODE_NAME} ]; then
+		NODE_NAME="couchdb@${HOSTNAME}"
+	fi
+	sed -i -e "s/^-name .*$/-name ${NODE_NAME}/" -e "s/^-setcookie .*$/-setcookie ${COOKIE}/" ${HOME}/etc/vm.args
+	exec ${HOME}/bin/couchdb_init &
+fi
+
+exec ${HOME}/bin/couchdb
